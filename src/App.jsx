@@ -548,9 +548,10 @@ export default function App() {
                       )}
 
                       {task.description && (
-                         <p className="text-[12px] opacity-60 line-clamp-1 mt-1 font-normal break-words">
-                            {task.description}
-                         </p>
+                         <div 
+                           className="text-[12px] opacity-60 line-clamp-2 mt-1 font-normal break-words prose prose-sm dark:prose-invert max-w-none"
+                           dangerouslySetInnerHTML={parseMarkdown(task.description)}
+                         />
                       )}
                       
                       {hasMetaInfo && (
@@ -787,16 +788,6 @@ export default function App() {
                   />
                 </div>
 
-                {/* Minimal Markdown Preview */}
-                {selectedTask.description && (
-                  <div className={`mt-4 p-5 rounded-2xl border ${isDark ? 'bg-[#282828] border-[#444]' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className="text-xs uppercase font-semibold opacity-50 mb-3 tracking-wider">Podgląd</div>
-                    <div 
-                      className="text-[15px] leading-relaxed prose prose-sm dark:prose-invert max-w-none break-words"
-                      dangerouslySetInnerHTML={parseMarkdown(selectedTask.description)} 
-                    />
-                  </div>
-                )}
               </div>
 
             </div>
