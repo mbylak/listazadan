@@ -563,11 +563,11 @@ export default function App() {
                           )}
 
                           {cat && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider" style={{ backgroundColor: cat.color + '20', color: cat.color }}>
-                              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.color }}></div>
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border uppercase font-semibold tracking-wider" style={{ borderColor: cat.color, color: cat.color, backgroundColor: 'transparent' }}>
                               {cat.name}
                             </span>
                           )}
+
 
                           {totalSubtasks > 0 && (
                             <span className={`text-[11px] flex items-center gap-1 ${completedSubtasks === totalSubtasks ? 'text-green-600 dark:text-green-400 font-medium' : 'opacity-60'}`}>
