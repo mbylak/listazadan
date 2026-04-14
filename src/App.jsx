@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Settings, Plus, ChevronUp, ChevronDown, 
   Play, Check, Square, CheckSquare, Download, Tag, 
-  AlignLeft, Trash2, X, ListTodo, CalendarDays, StopCircle, ArrowLeft
+  AlignLeft, Trash2, X, ListTodo, CalendarDays, StopCircle, ArrowLeft,
+  Repeat, Flame, Target
 } from 'lucide-react';
 
 // --- Minimalist Markdown Parser ---
@@ -45,8 +46,9 @@ export default function App() {
     timeTrackingEnabled: true,
     themeMode: 'auto' // 'auto', 'light', 'dark'
   });
+  const [habits, setHabits] = useState([]);
   
-  const [activeTab, setActiveTab] = useState('today'); // 'today', 'tomorrow'
+  const [activeTab, setActiveTab] = useState('today'); // 'today', 'tomorrow', 'habits'
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -70,9 +72,11 @@ export default function App() {
         const savedTasks = localStorage.getItem('fluent_tasks_v2');
         const savedCats = localStorage.getItem('fluent_cats_v2');
         const savedSet = localStorage.getItem('fluent_settings_v2');
+        const savedHabits = localStorage.getItem('fluent_habits_v2');
         if (savedTasks) setTasks(JSON.parse(savedTasks));
         if (savedCats) setCategories(JSON.parse(savedCats));
         if (savedSet) setSettings(JSON.parse(savedSet));
+        if (savedHabits) setHabits(JSON.parse(savedHabits));
         setIsLoading(false);
         return;
       }
@@ -89,6 +93,7 @@ export default function App() {
           if (data.tasks) setTasks(data.tasks);
           if (data.categories) setCategories(data.categories);
           if (data.settings) setSettings(data.settings);
+          if (data.habits) setHabits(data.habits);
         }
       } catch (err) {
         console.error("Błąd wczytywania z Supabase", err);
@@ -113,6 +118,7 @@ export default function App() {
            if (newRecord?.tasks) setTasks(newRecord.tasks);
            if (newRecord?.categories) setCategories(newRecord.categories);
            if (newRecord?.settings) setSettings(newRecord.settings);
+           if (newRecord?.habits) setHabits(newRecord.habits);
         })
         .subscribe();
 
@@ -130,6 +136,7 @@ export default function App() {
     localStorage.setItem('fluent_tasks_v2', JSON.stringify(tasks));
     localStorage.setItem('fluent_cats_v2', JSON.stringify(categories));
     localStorage.setItem('fluent_settings_v2', JSON.stringify(settings));
+    localStorage.setItem('fluent_habits_v2', JSON.stringify(habits));
 
     if (skipNextSync.current) {
         skipNextSync.current = false;
@@ -145,6 +152,7 @@ export default function App() {
             tasks,
             categories,
             settings,
+            habits,
             updated_at: timestamp
          });
       };
@@ -156,7 +164,7 @@ export default function App() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [tasks, categories, settings, isLoading]);
+  }, [tasks, categories, settings, habits, isLoading]);
 
 
   // --- THEME MANAGEMENT ---
@@ -389,6 +397,143 @@ export default function App() {
     link.remove();
   };
 
+  // --- HABITS HELPERS ---
+  const dayNamesShort = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+
+  const formatDateKey = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const todayKey = formatDateKey(new Date());
+
+  const weekDates = useMemo(() => {
+    const today = new Date();
+    const dow = today.getDay(); // 0=Sun
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((dow === 0 ? 7 : dow) - 1));
+    monday.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  }, [todayKey]);
+
+  const shouldTrackDay = (habit, date) => {
+    const dow = date.getDay();
+    switch (habit.frequency) {
+      case 'daily': return true;
+      case 'workdays': return dow >= 1 && dow <= 5;
+      case 'every2days': {
+        const created = new Date(habit.createdAt);
+        created.setHours(0,0,0,0);
+        const diff = Math.floor((date.getTime() - created.getTime()) / 86400000);
+        return diff % 2 === 0;
+      }
+      case 'ndays': return true;
+      default: return true;
+    }
+  };
+
+  const getHabitStreak = (habit) => {
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let checkDate = new Date(today);
+    let gracesUsed = 0;
+    const maxGraces = habit.allowGracePeriod ? 1 : 0;
+    for (let i = 0; i < 400; i++) {
+      const key = formatDateKey(checkDate);
+      if (!shouldTrackDay(habit, checkDate)) {
+        checkDate.setDate(checkDate.getDate() - 1);
+        continue;
+      }
+      if (habit.completions?.[key]) {
+        streak++;
+      } else if (gracesUsed < maxGraces) {
+        gracesUsed++;
+      } else {
+        break;
+      }
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    return streak;
+  };
+
+  const getHabitConsistency = (habit) => {
+    const created = new Date(habit.createdAt);
+    created.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let totalDays = 0;
+    let completedDays = 0;
+    let checkDate = new Date(created);
+    while (checkDate <= today) {
+      if (shouldTrackDay(habit, checkDate)) {
+        totalDays++;
+        if (habit.completions?.[formatDateKey(checkDate)]) completedDays++;
+      }
+      checkDate.setDate(checkDate.getDate() + 1);
+    }
+    return { totalDays, completedDays, ratio: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0 };
+  };
+
+  const toggleHabitDay = (habitId, dateKey) => {
+    setHabits(prev => prev.map(h => {
+      if (h.id !== habitId) return h;
+      const completions = { ...h.completions };
+      if (completions[dateKey]) { delete completions[dateKey]; } else { completions[dateKey] = true; }
+      return { ...h, completions };
+    }));
+  };
+
+  const addHabit = () => {
+    setHabits(prev => [...prev, {
+      id: 'habit_' + Date.now(),
+      name: 'Nowy nawyk',
+      color: '#0078D4',
+      frequency: 'daily',
+      nDaysTarget: 3,
+      goalMinutes: 0,
+      allowGracePeriod: false,
+      completions: {},
+      createdAt: formatDateKey(new Date())
+    }]);
+  };
+
+  const updateHabit = (id, updates) => {
+    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+  };
+
+  const deleteHabit = (id) => {
+    setHabits(prev => prev.filter(h => h.id !== id));
+  };
+
+  const exportHabitsCSV = () => {
+    const headers = ['Nawyk', 'Częstotliwość', 'Dni wykonane', 'Dni śledzono', 'Konsekwencja (%)'];
+    const freqNames = { daily: 'Codziennie', workdays: 'Dni robocze', every2days: 'Co 2 dni', ndays: 'N dni/tydz.' };
+    const rows = habits.map(h => {
+      const { totalDays, completedDays, ratio } = getHabitConsistency(h);
+      return [
+        `"${h.name}"`,
+        freqNames[h.frequency] || h.frequency,
+        completedDays,
+        totalDays,
+        ratio
+      ].join(',');
+    });
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `nawyki_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   // --- STYLES (Fluent UI Tokens) ---
   const themeClasses = isDark ? 'bg-[#202020] text-gray-100' : 'bg-[#F3F3F3] text-gray-900';
   const sidebarClasses = isDark ? 'bg-[#282828] border-[#333]' : 'bg-[#FAFAFA] border-gray-200';
@@ -436,6 +581,13 @@ export default function App() {
         >
           <ListTodo size={22} />
         </button>
+        <button 
+          onClick={() => { setActiveTab('habits'); setIsMobileDetailView(false); setSelectedTaskId(null); }}
+          className={`p-3 rounded-xl mt-4 transition-all ${activeTab === 'habits' ? 'bg-[#0078D4] text-white shadow-md' : buttonSubtleClasses}`}
+          title="Nawyki"
+        >
+          <Repeat size={22} />
+        </button>
         
         <div className="flex-grow" />
         
@@ -457,11 +609,216 @@ export default function App() {
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 flex overflow-hidden relative">
 
+        {/* --- HABITS VIEW --- */}
+        {activeTab === 'habits' && (
+          <div className="flex-1 overflow-y-auto p-5 md:p-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
+                  <Repeat size={28} className="text-[#0078D4]" /> Nawyki
+                </h1>
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportHabitsCSV}
+                    className={`p-2.5 rounded-xl border transition-colors ${isDark ? 'border-[#3D3D3D] hover:bg-[#333]' : 'border-gray-200 bg-white hover:bg-gray-50 shadow-sm'}`}
+                    title="Eksportuj raport nawyków"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button
+                    onClick={addHabit}
+                    className={`px-4 py-2.5 rounded-xl flex items-center gap-2 font-semibold text-sm ${buttonPrimaryClasses}`}
+                  >
+                    <Plus size={16} /> Dodaj nawyk
+                  </button>
+                </div>
+              </div>
+
+              {habits.length === 0 ? (
+                <div className={`text-center py-16 rounded-2xl border ${isDark ? 'bg-[#2D2D2D] border-[#3D3D3D]' : 'bg-white border-gray-200 shadow-sm'}`}>
+                  <Repeat size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="text-lg font-medium opacity-50">Brak nawyków</p>
+                  <p className="text-sm opacity-40 mt-1">Dodaj pierwszy nawyk, aby zacząć śledzenie</p>
+                </div>
+              ) : (
+                <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#2D2D2D] border-[#3D3D3D]' : 'bg-white border-gray-200 shadow-sm'}`}>
+                  {/* Header row with dates */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[600px]">
+                      <thead>
+                        <tr className={`border-b ${isDark ? 'border-[#3D3D3D]' : 'border-gray-100'}`}>
+                          <th className="text-left p-4 font-semibold text-sm w-[200px]">Nawyk</th>
+                          {weekDates.map((date, i) => {
+                            const dateKey = formatDateKey(date);
+                            const isToday = dateKey === todayKey;
+                            return (
+                              <th key={i} className={`p-2 text-center min-w-[52px] ${isToday ? 'bg-[#0078D4]/10' : ''}`}>
+                                <div className={`text-lg font-bold ${isToday ? 'text-[#0078D4]' : ''}`}>{date.getDate()}</div>
+                                <div className={`text-[10px] uppercase tracking-wider font-medium ${isToday ? 'text-[#0078D4]' : 'opacity-50'}`}>{dayNamesShort[i]}</div>
+                              </th>
+                            );
+                          })}
+                          <th className="p-2 text-center min-w-[80px]">
+                            <div className="text-[10px] uppercase tracking-wider font-medium opacity-50">Seria</div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {habits.map(habit => {
+                          const streak = getHabitStreak(habit);
+                          const { ratio } = getHabitConsistency(habit);
+                          return (
+                            <tr key={habit.id} className={`border-b last:border-0 ${isDark ? 'border-[#3D3D3D]' : 'border-gray-50'}`}>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: habit.color }} />
+                                  <span className="font-medium text-[14px] truncate">{habit.name}</span>
+                                </div>
+                                <div className="text-[10px] opacity-40 mt-0.5 ml-[18px]">{ratio}% konsekwencji</div>
+                              </td>
+                              {weekDates.map((date, i) => {
+                                const dateKey = formatDateKey(date);
+                                const isToday = dateKey === todayKey;
+                                const done = habit.completions?.[dateKey];
+                                const tracked = shouldTrackDay(habit, date);
+                                const isPast = date <= new Date();
+                                return (
+                                  <td key={i} className={`p-1 text-center ${isToday ? 'bg-[#0078D4]/10' : ''}`}>
+                                    {tracked ? (
+                                      <button
+                                        onClick={() => toggleHabitDay(habit.id, dateKey)}
+                                        className={`w-9 h-9 rounded-xl mx-auto flex items-center justify-center transition-all text-lg
+                                          ${done 
+                                            ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30' 
+                                            : isPast 
+                                              ? `${isDark ? 'bg-red-500/10 text-red-400/60 hover:bg-red-500/20' : 'bg-red-50 text-red-300 hover:bg-red-100'}` 
+                                              : `${isDark ? 'bg-[#333] hover:bg-[#3D3D3D] text-gray-600' : 'bg-gray-50 hover:bg-gray-100 text-gray-300'}`
+                                          }`}
+                                      >
+                                        {done ? '✓' : isPast ? '✗' : '·'}
+                                      </button>
+                                    ) : (
+                                      <div className="w-9 h-9 mx-auto flex items-center justify-center text-gray-300 dark:text-gray-600 text-xs">—</div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="p-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {streak >= 21 && <span>🎯</span>}
+                                  {streak >= 7 && streak < 21 && <Flame size={14} className="text-orange-500" />}
+                                  <span className={`text-sm font-bold ${streak >= 21 ? 'text-[#0078D4]' : streak >= 7 ? 'text-orange-500' : streak > 0 ? 'text-green-500' : 'opacity-30'}`}>
+                                    {streak}
+                                  </span>
+                                  {streak >= 21 && <span className="text-[10px] font-bold text-[#0078D4] ml-0.5">{streak} dni!</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Habit Detail Cards */}
+              {habits.length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h2 className="text-sm font-semibold opacity-60 uppercase tracking-wider flex items-center gap-2">
+                    <Settings size={14} /> Konfiguracja nawyków
+                  </h2>
+                  {habits.map(habit => {
+                    const { totalDays, completedDays, ratio } = getHabitConsistency(habit);
+                    return (
+                      <div key={habit.id} className={`p-4 rounded-2xl border ${isDark ? 'bg-[#2D2D2D] border-[#3D3D3D]' : 'bg-white border-gray-200 shadow-sm'}`}>
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="color"
+                            value={habit.color}
+                            onChange={(e) => updateHabit(habit.id, { color: e.target.value })}
+                            className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent mt-1 flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              value={habit.name}
+                              onChange={(e) => updateHabit(habit.id, { name: e.target.value })}
+                              className="bg-transparent outline-none font-semibold text-[16px] w-full border-b border-transparent focus:border-[#0078D4] transition-colors pb-1"
+                            />
+                            <div className="flex flex-wrap gap-3 mt-3">
+                              <div className="flex-1 min-w-[140px]">
+                                <label className="text-[10px] uppercase font-semibold opacity-50 tracking-wider block mb-1">Częstotliwość</label>
+                                <select
+                                  value={habit.frequency}
+                                  onChange={(e) => updateHabit(habit.id, { frequency: e.target.value })}
+                                  className={`w-full p-2 rounded-lg text-sm border outline-none ${isDark ? 'bg-[#333] border-[#444]' : 'bg-gray-50 border-gray-200'}`}
+                                >
+                                  <option value="daily">Codziennie</option>
+                                  <option value="workdays">Dni robocze</option>
+                                  <option value="every2days">Co 2 dni</option>
+                                  <option value="ndays">N dni w tygodniu</option>
+                                </select>
+                              </div>
+                              {habit.frequency === 'ndays' && (
+                                <div className="min-w-[100px]">
+                                  <label className="text-[10px] uppercase font-semibold opacity-50 tracking-wider block mb-1">Ile dni/tydz.</label>
+                                  <input
+                                    type="number" min="1" max="7"
+                                    value={habit.nDaysTarget || 3}
+                                    onChange={(e) => updateHabit(habit.id, { nDaysTarget: parseInt(e.target.value) || 3 })}
+                                    className={`w-full p-2 rounded-lg text-sm border outline-none ${isDark ? 'bg-[#333] border-[#444]' : 'bg-gray-50 border-gray-200'}`}
+                                  />
+                                </div>
+                              )}
+                              <div className="min-w-[120px]">
+                                <label className="text-[10px] uppercase font-semibold opacity-50 tracking-wider block mb-1">Cel (minuty)</label>
+                                <input
+                                  type="number" min="0"
+                                  value={habit.goalMinutes || 0}
+                                  onChange={(e) => updateHabit(habit.id, { goalMinutes: parseInt(e.target.value) || 0 })}
+                                  placeholder="0 = brak"
+                                  className={`w-full p-2 rounded-lg text-sm border outline-none ${isDark ? 'bg-[#333] border-[#444]' : 'bg-gray-50 border-gray-200'}`}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-black/5 dark:border-white/5">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={habit.allowGracePeriod || false}
+                                  onChange={(e) => updateHabit(habit.id, { allowGracePeriod: e.target.checked })}
+                                  className="w-4 h-4 rounded accent-[#0078D4]"
+                                />
+                                <span className="text-xs opacity-70">Pozwól przerwać serię 1×/2 tyg. bez resetu</span>
+                              </label>
+                              <div className="text-xs opacity-50">
+                                <span className="font-mono">{completedDays}/{totalDays}</span> = <span className="font-bold">{ratio}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => deleteHabit(habit.id)}
+                            className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* --- LEFT PANEL: LIST OF TASKS --- */}
         <div className={`
           flex flex-col border-r w-full md:w-[350px] lg:w-[400px] absolute md:relative inset-0 z-10 transition-transform duration-300
           ${isMobileDetailView ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}
           ${sidebarClasses}
+          ${activeTab === 'habits' ? 'hidden' : ''}
         `}>
           
           {/* Mobile Tabs */}
@@ -477,6 +834,12 @@ export default function App() {
               className={`flex-1 py-2 text-sm font-semibold rounded-lg text-center transition-colors ${activeTab === 'tomorrow' ? 'bg-[#0078D4] text-white' : buttonSubtleClasses}`}
             >
               Jutro
+            </button>
+            <button 
+              onClick={() => setActiveTab('habits')}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg text-center transition-colors ${activeTab === 'habits' ? 'bg-[#0078D4] text-white' : buttonSubtleClasses}`}
+            >
+              Nawyki
             </button>
           </div>
 
@@ -620,6 +983,7 @@ export default function App() {
         <div className={`
           flex-1 h-full overflow-y-auto absolute md:relative inset-0 bg-inherit transition-transform duration-300 z-10
           ${isMobileDetailView ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+          ${activeTab === 'habits' ? 'hidden' : ''}
         `}>
           {selectedTask ? (
             <div className="max-w-3xl mx-auto p-5 md:p-8 pb-32">
