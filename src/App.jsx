@@ -167,6 +167,29 @@ export default function App() {
 
 
   // --- DERIVED STATE ---
+  // Aktualizacja tytułu karty przeglądarki na żywo
+  useEffect(() => {
+    const runningTask = tasks.find(t => t.isRunning);
+    if (runningTask && runningTask.startTime) {
+       const elapsedMs = (runningTask.durationMs || 0) + (currentTime.getTime() - runningTask.startTime);
+       const totalSeconds = Math.floor(elapsedMs / 1000);
+       
+       // Dopuszczamy >59 minut żeby pokazywało np. 85:12, jeśli to celowe, lub przeliczamy na HH:MM:SS
+       // Żądanie: "30:12 - (Nazwa zadania)"
+       const h = Math.floor(totalSeconds / 3600);
+       const m = Math.floor((totalSeconds % 3600) / 60);
+       const s = totalSeconds % 60;
+       
+       const timeString = h > 0 
+           ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+           : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+           
+       document.title = `${timeString} - ${runningTask.title}`;
+    } else {
+       document.title = "Zadania";
+    }
+  }, [tasks, currentTime]);
+
   const totalTodayMinutes = useMemo(() => {
     let totals = 0;
     tasks.filter(t => t.date === 'today').forEach(t => {
