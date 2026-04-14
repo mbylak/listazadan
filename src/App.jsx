@@ -843,7 +843,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="p-4 md:p-5 pb-2 md:pb-3 flex flex-col flex-shrink-0 gap-1 border-b border-black/5 dark:border-white/5">
+          <div className={`flex flex-col flex-shrink-0 border-b border-black/5 dark:border-white/5 ${settings.timeTrackingEnabled ? 'p-4 md:p-5 pb-2 md:pb-3 gap-1' : 'p-4 md:p-5 pb-3 md:pb-4'}`}>
             <h1 className="text-2xl font-semibold tracking-tight hidden md:block">
               {activeTab === 'today' ? 'Dzisiaj' : 'Jutro'}
             </h1>
