@@ -60,6 +60,7 @@ export default function App() {
 
   const [isLoading, setIsLoading] = useState(true);
   const skipNextSync = useRef(false);
+  const lastLocalUpdateTime = useRef(null);
 
   // SUPABASE: Wczytywanie z chmury przy starcie i subskrypcja zmian
   useEffect(() => {
@@ -102,9 +103,13 @@ export default function App() {
       const channel = supabase
         .channel('public:app_state')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state', filter: 'user_id=eq.michal_bylak' }, payload => {
-           // Jeśli dane uległy zmianie na innym urządzeniu
-           skipNextSync.current = true;
            const newRecord = payload.new;
+           // Ignoruj zdarzenia wywołane naszym własnym zapisem
+           if (lastLocalUpdateTime.current && newRecord?.updated_at === lastLocalUpdateTime.current) {
+             return;
+           }
+           // Zmiana z innego urządzenia — zastosuj
+           skipNextSync.current = true;
            if (newRecord?.tasks) setTasks(newRecord.tasks);
            if (newRecord?.categories) setCategories(newRecord.categories);
            if (newRecord?.settings) setSettings(newRecord.settings);
@@ -133,12 +138,14 @@ export default function App() {
 
     if (supabase) {
       const syncToCloud = async () => {
+         const timestamp = new Date().toISOString();
+         lastLocalUpdateTime.current = timestamp;
          await supabase.from('app_state').upsert({
-            user_id: 'michal_bylak', // domyślny użytkownik ustalony w kodzie
+            user_id: 'michal_bylak',
             tasks,
             categories,
             settings,
-            updated_at: new Date().toISOString()
+            updated_at: timestamp
          });
       };
       
