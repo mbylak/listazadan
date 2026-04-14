@@ -355,7 +355,7 @@ export default function App() {
 
   return (
     <div 
-      className={`min-h-screen w-full flex flex-col md:flex-row overflow-hidden ${themeClasses}`}
+      className={`fixed inset-0 h-[100dvh] w-full flex flex-col md:flex-row overflow-hidden ${themeClasses}`}
       style={{ fontFamily: '"Segoe UI Variable", "Segoe UI", "Helvetica Neue", sans-serif' }}
     >
       {/* --- TOP BAR (Mobile + Desktop Clock) --- */}
@@ -551,7 +551,7 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Dodaj nowe zadanie..."
-                className={`w-full py-3 pl-4 pr-12 text-[15px] rounded-xl outline-none transition-all border shadow-sm
+                className={`w-full py-3 pl-4 pr-12 text-[16px] rounded-xl outline-none transition-all border shadow-sm
                   ${isDark ? 'bg-[#333] border-[#444] focus:border-[#0078D4]' : 'bg-white border-gray-300 focus:border-[#0078D4]'}
                 `}
                 value={newTaskTitle}
@@ -645,7 +645,7 @@ export default function App() {
                       <input 
                          type="number"
                          min="0"
-                         className={`w-24 p-1.5 text-center text-sm rounded-lg border outline-none font-mono transition-colors ${isDark ? 'bg-[#333] border-[#444] focus:border-[#0078D4]' : 'bg-white border-gray-300 focus:border-[#0078D4]'}`}
+                         className={`w-24 p-1.5 text-center text-[16px] rounded-lg border outline-none font-mono transition-colors ${isDark ? 'bg-[#333] border-[#444] focus:border-[#0078D4]' : 'bg-white border-gray-300 focus:border-[#0078D4]'}`}
                          onBlur={(e) => {
                             if (e.target.value === '') return;
                             const minVal = parseFloat(e.target.value);
@@ -667,7 +667,7 @@ export default function App() {
                     <Tag size={14} /> Kategoria zadania
                   </label>
                   <select 
-                    className={`w-full p-2.5 rounded-xl text-[15px] font-medium bg-transparent outline-none border transition-colors cursor-pointer ${isDark ? 'border-[#444] focus:border-[#0078D4]' : 'border-gray-200 focus:border-[#0078D4]'}`}
+                    className={`w-full p-2.5 rounded-xl text-[16px] font-medium bg-transparent outline-none border transition-colors cursor-pointer ${isDark ? 'border-[#444] focus:border-[#0078D4]' : 'border-gray-200 focus:border-[#0078D4]'}`}
                     value={selectedTask.categoryId || ''}
                     onChange={(e) => updateTask(selectedTask.id, { categoryId: e.target.value })}
                   >
@@ -719,7 +719,7 @@ export default function App() {
                       name="subtask"
                       type="text" 
                       placeholder="Dodaj nowe podzadanie..." 
-                      className={`flex-1 text-[15px] bg-transparent outline-none placeholder-gray-400`}
+                      className={`flex-1 text-[16px] bg-transparent outline-none placeholder-gray-400`}
                     />
                   </form>
                 </div>
@@ -733,7 +733,7 @@ export default function App() {
                 
                 <div className={`rounded-2xl border p-1 ${isDark ? 'bg-[#2D2D2D] border-[#3D3D3D]' : 'bg-white border-gray-200 shadow-sm'} focus-within:border-[#0078D4] focus-within:ring-1 focus-within:ring-[#0078D4] transition-all`}>
                   <textarea 
-                    className={`w-full min-h-[150px] bg-transparent outline-none resize-y text-[15px] p-3 rounded-xl`}
+                    className={`w-full min-h-[150px] bg-transparent outline-none resize-y text-[16px] p-3 rounded-xl`}
                     placeholder="Wpisz opcjonalny opis. Możesz używać składni Markdown (np. **pogrubienie**, - lista)."
                     value={selectedTask.description}
                     onChange={(e) => updateTask(selectedTask.id, { description: e.target.value })}
