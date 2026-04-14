@@ -54,6 +54,10 @@ export default function App() {
   // Mobile View Management
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
 
+  // Zmienna dla alertu o przerwie
+  const [showBreakPopup, setShowBreakPopup] = useState(false);
+  const breakPopupShownRef = useRef(new Set());
+
   const [isLoading, setIsLoading] = useState(true);
   const skipNextSync = useRef(false);
 
@@ -97,12 +101,13 @@ export default function App() {
     if (supabase) {
       const channel = supabase
         .channel('public:app_state')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state', filter: 'user_id=eq.michal_bylak' }, payload => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state', filter: 'user_id=eq.michal_bylak' }, payload => {
            // Jeśli dane uległy zmianie na innym urządzeniu
            skipNextSync.current = true;
-           if (payload.new.tasks) setTasks(payload.new.tasks);
-           if (payload.new.categories) setCategories(payload.new.categories);
-           if (payload.new.settings) setSettings(payload.new.settings);
+           const newRecord = payload.new;
+           if (newRecord?.tasks) setTasks(newRecord.tasks);
+           if (newRecord?.categories) setCategories(newRecord.categories);
+           if (newRecord?.settings) setSettings(newRecord.settings);
         })
         .subscribe();
 
@@ -185,6 +190,16 @@ export default function App() {
            : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
            
        document.title = `${timeString} - ${runningTask.title}`;
+       
+       // Alert o 90-minutowej pracy (1.5h)
+       const totalMinutes = totalSeconds / 60;
+       if (totalMinutes >= 90 && !breakPopupShownRef.current.has(runningTask.id)) {
+           setShowBreakPopup(true);
+           breakPopupShownRef.current.add(runningTask.id);
+       } else if (totalMinutes < 90 && breakPopupShownRef.current.has(runningTask.id)) {
+           // Jeżeli czas został zedytowany ręcznie do wartości < 90m
+           breakPopupShownRef.current.delete(runningTask.id);
+       }
     } else {
        document.title = "Zadania";
     }
@@ -878,6 +893,27 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- POPUP O PRZERWIE (90 MIN) --- */}
+      {showBreakPopup && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-300">
+           <div className={`w-full max-w-sm p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center ${isDark ? 'bg-[#202020] border border-[#3D3D3D]' : 'bg-white border border-gray-200'}`}>
+              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-5">
+                 <Settings size={32} className="animate-spin-slow" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Rozważ przerwę!</h2>
+              <p className="text-[15px] opacity-70 mb-8 leading-relaxed">
+                 Pracujesz już nieprzerwanie od ponad półtorej godziny. Odpocznij przez chwilę, napij się wody lub przejdź, aby zregenerować umysł!
+              </p>
+              <button 
+                onClick={() => setShowBreakPopup(false)}
+                className={`w-full py-3.5 rounded-xl text-base font-bold text-white transition-all transform hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-[#0078D4] hover:bg-[#006CBE]'}`}
+              >
+                 Dzięki za przypomnienie!
+              </button>
+           </div>
+         </div>
       )}
 
     </div>
