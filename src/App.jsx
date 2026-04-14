@@ -477,9 +477,11 @@ export default function App() {
             <h1 className="text-2xl font-semibold tracking-tight hidden md:block">
               {activeTab === 'today' ? 'Dzisiaj' : 'Jutro'}
             </h1>
-            <div className="text-sm font-semibold text-[#0078D4] flex items-center gap-1.5 pt-1">
-              <Play size={14} /> Dzisiejszy czas: {totalTodayMinutes} min
-            </div>
+            {settings.timeTrackingEnabled && (
+              <div className="text-sm font-semibold text-[#0078D4] flex items-center gap-1.5 pt-1">
+                <Play size={14} /> Dzisiejszy czas: {totalTodayMinutes} min
+              </div>
+            )}
           </div>
 
           {/* List Area */}
@@ -702,14 +704,14 @@ export default function App() {
               <div className={`p-4 rounded-2xl border mb-8 flex flex-col sm:flex-row sm:items-center gap-4 ${isDark ? 'bg-[#2D2D2D] border-[#3D3D3D]' : 'bg-white border-gray-100 shadow-sm'}`}>
                 <div className="flex-1">
                   <label className="text-xs uppercase font-semibold opacity-60 flex items-center gap-1.5 mb-1.5">
-                    <Tag size={14} /> Kategoria zadania
+                    <Tag size={14} /> Kategoria
                   </label>
                   <select 
                     className={`w-full p-2.5 rounded-xl text-[16px] font-medium bg-transparent outline-none border transition-colors cursor-pointer ${isDark ? 'border-[#444] focus:border-[#0078D4]' : 'border-gray-200 focus:border-[#0078D4]'}`}
                     value={selectedTask.categoryId || ''}
                     onChange={(e) => updateTask(selectedTask.id, { categoryId: e.target.value })}
                   >
-                    <option value="" className={isDark ? "bg-[#2D2D2D]" : "bg-white"}>--- Wybierz kategorię ---</option>
+                    <option value="" className={isDark ? "bg-[#2D2D2D]" : "bg-white"}>Wybierz kategorię</option>
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id} className={isDark ? "bg-[#2D2D2D]" : "bg-white"}>
                         {cat.name}
